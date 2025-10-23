@@ -9,8 +9,8 @@ class BaseNode:
     """
 
     def __init__(self, parents : Optional[List] = None, no_childern : int = 1) -> None:
+        self.childern : List[List[Tuple['BaseNode', int]]] = [[]] * no_childern
         self.set_parents(parents or [])
-        self.childern : List[List[Tuple['BaseNode', int]]] = [[]] * no_childern  # List[List[Tuple]]
         
         # Used for memoization
         self.x : np.ndarray    = np.array([])   # x is input
@@ -24,16 +24,19 @@ class BaseNode:
     
     def set_parents(self, parents : list) -> None:
         self.parents : List[Tuple['BaseNode', int]] = []
-        for index_cur_input, (parent, index_parent_output) in enumerate(parents):
-            # index_cur_input is the index of the current node's input array which corresponds
-            # to the parent
-            # parent is the previous parent node
-            # index_parent_output is the index of the parent output array
-            # corresponds to the current node
-            self.parents.append((parent, index_parent_output))
-            parent.add_child(self, index_cur_input, index_parent_output)
+
+        """
+        index_cur_input is the index of the current node's input array which corresponds to the parent
+        parent is the previous parent node
+        index_parent_output is the index of the parent output array
+        corresponds to the current node
+        """
+        for index_cur_input, parent in enumerate(parents):
+            parent_node, index_parent_output = parent
+            self.parents.append((parent_node, index_parent_output))
+            parent_node.add_child(self, index_parent_output, index_cur_input)
     
-    def add_child(self, index_output : int, child : 'BaseNode', index_child_input : int) -> None:
+    def add_child(self, child : 'BaseNode', index_output : int, index_child_input : int) -> None:
         """
             Adds a child of the current node
             :param index_output      : index of the output array to which the child corresponds to
