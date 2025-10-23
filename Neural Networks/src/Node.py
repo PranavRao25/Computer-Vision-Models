@@ -2,7 +2,7 @@ from typing import Optional, Any, List, Tuple
 import numpy as np
 from abc import abstractmethod
 
-class Node:
+class BaseNode:
     """
         This is the implementation of a single neuron node in the computational graph.
         Each node does a memoization of its input and output to aid in the backprop.
@@ -10,7 +10,7 @@ class Node:
 
     def __init__(self, parents : Optional[List] = None, no_childern : int = 1) -> None:
         self.set_parents(parents or [])
-        self.childern : List[List[Tuple['Node', int]]] = [[]] * no_childern  # List[List[Tuple]]
+        self.childern : List[List[Tuple['BaseNode', int]]] = [[]] * no_childern  # List[List[Tuple]]
         
         # Used for memoization
         self.x : np.ndarray    = np.array([])   # x is input
@@ -23,7 +23,7 @@ class Node:
         self.grad_present : bool   = True
     
     def set_parents(self, parents : list) -> None:
-        self.parents : List[Tuple['Node', int]] = []
+        self.parents : List[Tuple['BaseNode', int]] = []
         for index_cur_input, (parent, index_parent_output) in enumerate(parents):
             # index_cur_input is the index of the current node's input array which corresponds
             # to the parent
@@ -33,7 +33,7 @@ class Node:
             self.parents.append((parent, index_parent_output))
             parent.add_child(self, index_cur_input, index_parent_output)
     
-    def add_child(self, index_output : int, child : 'Node', index_child_input : int) -> None:
+    def add_child(self, index_output : int, child : 'BaseNode', index_child_input : int) -> None:
         """
             Adds a child of the current node
             :param index_output      : index of the output array to which the child corresponds to
@@ -88,7 +88,7 @@ class Node:
         self.output_present = True
         self.grad_present = True
 
-class InputNode(Node):
+class InputNode(BaseNode):
     """
         Specifies the input to the computational graph
         It is the node with no in_degrees
@@ -125,7 +125,7 @@ class InputNode(Node):
 
         return np.array([self.dJdy[0]])
 
-class ParameterNode(Node):
+class ParameterNode(BaseNode):
     """
         Specifies the parameter values in the graph as either weight or a bias
     """
@@ -152,7 +152,7 @@ class ParameterNode(Node):
 
         return np.array([self.dJdy[0]])
 
-class SigmoidNode(Node):
+class SigmoidNode(BaseNode):
     def compute_output(self) -> np.ndarray:
         """
             Returns the sigmoid function evaluation of the input
@@ -167,7 +167,7 @@ class SigmoidNode(Node):
 
         return np.array([self.dJdy[0] * self.y[0] * (1 - self.y[0])])
 
-class GradientNode(Node):
+class GradientNode(BaseNode):
     """
         Acts as the final node of the computational graph, as a child of the cost function node
         It has no out_degrees
@@ -203,3 +203,37 @@ class GradientNode(Node):
 
         return np.array(self.value)
 
+class AddBiasNode(BaseNode):
+    def compute_gradient(self) -> np.ndarray:
+        return np.array([self.dJdy[0][:,1:]])
+    
+    def compute_output(self) -> np.ndarray:
+        return np.array([
+            np.concatenate((
+                    np.ones((self.x[0].shape[0], 1)),
+                    self.x[0]
+                ),
+                axis=1
+        )])
+
+class MultiplicationNode(BaseNode):
+    def compute_gradient(self) -> np.ndarray:
+        return np.array([np.dot(self.dJdy[0], self.x[1].T), np.dot(self.x[0].T, self.dJdy[0])])
+
+    def compute_output(self) -> np.ndarray:
+        return np.array([np.dot(self.x[0], self.x[1])])
+
+class TanhNode(BaseNode):
+    def compute_gradient(self) -> np.ndarray:
+        return np.array([self.dJdy[0] * (1-np.square(self.y[0]))])
+
+    def compute_output(self) -> np.ndarray:
+        return np.array([self.dJdy[0] * (1-np.square(self.y[0]))])
+
+class BinaryCrossEntropyNode(BaseNode):
+    def compute_gradient(self) -> np.ndarray:
+        return np.array([-self.dJdy[0]*(np.log(self.x[1]/(1-self.x[1]))), \
+            -self.dJdy[0]*(self.x[0]/self.x[1]-(1-self.x[0])/(1-self.x[1]))])
+
+    def compute_output(self) -> np.ndarray:
+        return np.array([-np.sum((self.x[0]*np.log(self.x[1]) + (1-self.x[0])*np.log(1-self.x[1])))])

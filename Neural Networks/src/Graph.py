@@ -1,6 +1,6 @@
 import numpy as np
 from typing import List, Optional, Any
-from Node import *
+from .Node import *
 
 class ComputationalGraph:
     """
@@ -14,9 +14,9 @@ class ComputationalGraph:
         6. Gradient node    - node  that initializes the gradient
     """
 
-    def __init__(self, input_nodes : List[InputNode], parameter_nodes : List[ParameterNode],
-                 output_nodes : List[Node], true_output_nodes : List[InputNode],
-                 cost_node : Node) -> None:
+    def __init__(self, nodes: List[BaseNode], input_nodes : List[InputNode], parameter_nodes : List[ParameterNode],
+                 output_nodes : List[BaseNode], true_output_nodes : List[InputNode],
+                 cost_node : BaseNode) -> None:
         
         self.input_nodes        = input_nodes
         self.parameter_nodes    = parameter_nodes
@@ -24,9 +24,7 @@ class ComputationalGraph:
         self.true_output_nodes  = true_output_nodes
         self.cost_node          = cost_node
         self.gradient_node      = GradientNode(parents=[(self.cost_node, 0)])
-
-        self.nodes : List[Node] = self.input_nodes + self.parameter_nodes + \
-                                  self.output_nodes + self.true_output_nodes
+        self.nodes              = nodes
         
     def forward(self, X : np.ndarray) -> np.ndarray:
         """

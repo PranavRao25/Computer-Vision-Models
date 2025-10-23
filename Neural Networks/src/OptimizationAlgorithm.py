@@ -1,7 +1,7 @@
 import numpy as np
 from typing import List, Optional
 from abc import abstractmethod
-from Node import *
+from .Node import *
 
 class OptimizingAlgorithm:
     """
