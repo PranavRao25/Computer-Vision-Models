@@ -11,12 +11,12 @@ class Node:
     def __init__(self, parents : Optional[List] = None, no_childern : int = 1) -> None:
         self.set_parents(parents or [])
         self.childern : List[List[Tuple['Node', int]]] = [[]] * no_childern  # List[List[Tuple]]
-
+        
         # Used for memoization
-        self.x : List    = None   # x is input
-        self.y : List    = None   # y is output
-        self.dJdy : List = None
-        self.dJdx : List = None
+        self.x : np.ndarray    = np.array([])   # x is input
+        self.y : np.ndarray    = np.array([])   # y is output
+        self.dJdy : np.ndarray = np.array([])
+        self.dJdx : np.ndarray = np.array([])
 
         # Flags for memoization
         self.output_present : bool = True
@@ -43,7 +43,7 @@ class Node:
 
         self.childern[index_output].append((child, index_child_input))
     
-    def get_output(self, index_cur_output : int) -> float:
+    def get_output(self, index_cur_output : int) -> Optional[float]:
         """
             Used for Forward Propagation
             Gets the output value from the given index out of the current node's output array
@@ -51,19 +51,19 @@ class Node:
         """
 
         if self.output_present: # parents have already their outputs ready
-            self.x = [
+            self.x = np.array([
                 parent.get_output(index_parent_output)
                 for (parent, index_parent_output) in self.parents
-            ]
+            ])
             self.y = self.compute_output()
             self.output_present = False
         return self.y[index_cur_output]
     
     @abstractmethod
-    def compute_output(self):
+    def compute_output(self) -> np.ndarray:
         raise NotImplementedError()
     
-    def get_gradient(self, index_cur_input):
+    def get_gradient(self, index_cur_input : int):
         """
             Used for Backward Propagation
         """
@@ -72,18 +72,134 @@ class Node:
             return np.zeros(self.x[index_cur_input].shape)
         
         if self.grad_present:  # childern already have their grads ready
-            self.dJdy = [
+            self.dJdy = np.array([
                 sum(child.get_gradient(index_child_input) for child, index_child_input in childern)
                 for childern in self.childern
-            ]
+            ])
             self.dJdx = self.compute_gradient()  # use to compute dydx into dJdx
             self.grad_present = False
         return self.dJdx[index_cur_input]
     
     @abstractmethod
-    def compute_gradient(self):
+    def compute_gradient(self) -> np.ndarray:
         raise NotImplementedError
     
     def reset_memoization(self):
         self.output_present = True
         self.grad_present = True
+
+class InputNode(Node):
+    """
+        Specifies the input to the computational graph
+        It is the node with no in_degrees
+    """
+
+    def __init__(self, value : Optional[float] = None, parents: List | None = None, no_childern: int = 1) -> None:
+        """
+            :param value: 
+        """
+
+        super().__init__(parents, no_childern)
+        self.set_value(value)
+
+    def get_output(self, index_cur_output: int) -> Optional[float]:
+        """
+            The node will simply return its input value back
+            :param index_cur_output: 
+        """
+
+        return self.value
+    
+    def set_value(self, value : Optional[float]):
+        """
+            To set the inputs
+            :param value: 
+        """
+
+        self.value = value
+    
+    def compute_gradient(self):
+        """
+
+        """
+
+        return np.array([self.dJdy[0]])
+
+class ParameterNode(Node):
+    """
+        Specifies the parameter values in the graph as either weight or a bias
+    """
+
+    def __init__(self, w : np.ndarray, parents: List | None = None, no_childern: int = 1) -> None:
+        """
+            :param w: parameter to store
+        """
+
+        super().__init__(parents, no_childern)
+        self.w = w
+    
+    def compute_output(self):
+        """
+            Returns the parameter value
+        """
+
+        return np.array([self.w])
+    
+    def compute_gradient(self):
+        """
+            Returns the gradient with respect to w
+        """
+
+        return np.array([self.dJdy[0]])
+
+class SigmoidNode(Node):
+    def compute_output(self) -> np.ndarray:
+        """
+            Returns the sigmoid function evaluation of the input
+        """
+
+        return np.array([1 / 1 + np.exp(-self.x[0])])
+    
+    def compute_gradient(self) -> np.ndarray:
+        """
+            Returns the gradient of the sigmoid function
+        """
+
+        return np.array([self.dJdy[0] * self.y[0] * (1 - self.y[0])])
+
+class GradientNode(Node):
+    """
+        Acts as the final node of the computational graph, as a child of the cost function node
+        It has no out_degrees
+    """
+
+    def __init__(self, value : float = 1, parents: List | None = None, no_childern: int = 1) -> None:
+        """
+            :param value: initialized to 1
+        """
+
+        super().__init__(parents, no_childern)
+        self.set_value(value)
+    
+    def set_value(self, value : float):
+        """
+            Set a gradient value as a init
+            :param value
+        """
+
+        self.value = value
+    
+    def compute_output(self) -> np.ndarray:
+        """
+            Return its input as it performs no operation
+        """
+
+        return self.x
+
+    def compute_gradient(self) -> np.ndarray:
+        """
+            Return the init grad value
+        """
+
+        return np.array(self.value)
+
